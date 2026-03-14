@@ -22,9 +22,9 @@ jobs:
           sudo apt install -y build-essential libncurses5-dev libncursesw5-dev zlib1g-dev gawk git gettext libssl-dev xsltproc wget unzip python3-distutils python3-setuptools swig rsync curl flex bison
           sudo apt autoremove -y && sudo apt clean -y
 
-      - name: 2. 拉取 OpenWRT 源码（以官方 23.05 为例）
+      - name: 2. 拉取 OpenWRT 源码（以官方 25.12.0 为例）
         run: |
-          git clone --depth 1 --branch v23.05.2 https://git.openwrt.org/openwrt/openwrt.git
+          git clone --depth 1 --branch v25.12.0 https://git.openwrt.org/openwrt/openwrt.git
           cd openwrt
           # 加载自定义配置（若未生成 config.seed，可先本地 make menuconfig 导出）
           [ -f ../config.seed ] && cp ../config.seed .config || echo "未找到 config.seed，后续需手动配置"
