@@ -31,9 +31,25 @@ jobs:
 
       - name: 3. 执行自定义脚本（添加插件、汉化）
         run: |
-          cd $GITHUB_WORKSPACE
-          chmod +x diy-part.sh
-          ./diy-part.sh
+        # 强制切到仓库根目录（双重确认）
+        cd "$GITHUB_WORKSPACE" || exit 1
+        # 打印关键信息（用于排查）
+        echo "当前目录：$(pwd)"
+        echo "根目录文件列表（含隐藏文件）："
+        ls -la "$GITHUB_WORKSPACE/"
+        echo "diy-part.sh 文件是否存在："
+        if [ -f "$GITHUB_WORKSPACE/diy-part.sh" ]; then
+          echo "✅ 文件存在！"
+        # 加执行权限（绝对路径）
+        chmod +x "$GITHUB_WORKSPACE/diy-part.sh"
+        # 执行脚本（绝对路径，避免相对路径坑）
+        "$GITHUB_WORKSPACE/diy-part.sh"
+        else
+        echo "❌ 文件不存在！根目录文件如下："
+        ls -la "$GITHUB_WORKSPACE/"
+         exit 1
+         fi
+          shell: /usr/bin/bash -e {0}
 
       - name: 4. 配置编译选项（可选：手动选机型/插件，注释则用 config.seed）
         run: |
