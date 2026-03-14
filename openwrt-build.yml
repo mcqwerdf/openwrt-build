@@ -1,0 +1,78 @@
+name: OpenWRT Cloud Build
+on:
+  push:
+    branches: [ main ]          # 推送代码到 main 分支时触发编译
+    paths:
+      - '.github/workflows/*'
+      - 'diy-part.sh'
+      - 'config.seed'
+  workflow_dispatch:            # 手动触发编译（GitHub 页面点 Run workflow）
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04       # 基于 Ubuntu 22.04 编译
+    steps:
+      - name: 1. 安装编译依赖
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo apt update -y
+          sudo apt full-upgrade -y
+          sudo apt install -y build-essential libncurses5-dev libncursesw5-dev zlib1g-dev gawk git gettext libssl-dev xsltproc wget unzip python3-distutils python3-setuptools swig rsync curl flex bison
+          sudo apt autoremove -y && sudo apt clean -y
+
+      - name: 2. 拉取 OpenWRT 源码（以官方 23.05 为例）
+        run: |
+          git clone --depth 1 --branch v23.05.2 https://git.openwrt.org/openwrt/openwrt.git
+          cd openwrt
+          # 加载自定义配置（若未生成 config.seed，可先本地 make menuconfig 导出）
+          [ -f ../config.seed ] && cp ../config.seed .config || echo "未找到 config.seed，后续需手动配置"
+
+      - name: 3. 执行自定义脚本（添加插件、汉化）
+        run: |
+          chmod +x diy-part.sh
+          ./diy-part.sh
+
+      - name: 4. 配置编译选项（可选：手动选机型/插件，注释则用 config.seed）
+        run: |
+          cd openwrt
+          # 若未提前生成 config.seed，取消下面注释，手动进入 menuconfig（云端交互）
+          # make menuconfig
+          # 保存配置到仓库（方便后续复用）
+          # cp .config ../config.seed
+
+      - name: 5. 下载编译依赖
+        run: |
+          cd openwrt
+          make download -j$(nproc)
+          find dl -size -1024c -exec ls -l {} \;
+          find dl -size -1024c -exec rm -f {} \;
+
+      - name: 6. 开始编译固件
+        run: |
+          cd openwrt
+          make -j$(nproc) V=s || make -j1 V=s  # 先多核编译，出错则单核重试
+          echo "编译完成，开始整理产物"
+
+      - name: 7. 上传固件到 GitHub Releases
+        uses: softprops/action-gh-release@v1
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: OpenWRT-Build-${{ github.run_id }}
+          files: |
+            openwrt/bin/targets/**/*.bin
+            openwrt/bin/targets/**/*.img.gz
+          body: |
+            OpenWRT 云端编译产物
+            - 集成 PassWall + QModem 插件
+            - 简体中文化
+            - 编译时间: ${{ github.run_at }}
+
+      - name: 8. 清理空间（可选）
+        if: always()
+        run: |
+          sudo rm -rf openwrt
+          sudo apt autoremove -y && sudo apt clean -y
